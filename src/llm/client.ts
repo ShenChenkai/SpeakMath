@@ -1,6 +1,7 @@
 import { requestUrl } from "obsidian";
-import type { LatexPluginSettings, LlmProvider } from "../types";
+import type { LatexPluginSettings, LlmProvider, ProviderConfig } from "../types";
 import { buildSystemPrompt } from "../prompt";
+import { getAzureDefaultApiVersion, providerNeedsApiKey } from "../providers";
 
 interface OpenAICompatibleResponse {
 	choices?: Array<{
@@ -20,13 +21,12 @@ export class LlmClient {
 		const provider = this.settings.provider;
 		const providerConfig = this.settings.providers[provider];
 
-		if (!providerConfig.apiKey.trim()) {
+		if (providerNeedsApiKey(provider) && !providerConfig.apiKey.trim()) {
 			throw new Error(`Provider ${provider} has no API key configured.`);
 		}
 
-		const endpoint = `${providerConfig.baseUrl.replace(/\/$/, "")}/chat/completions`;
-		const payload = {
-			model: providerConfig.model,
+		const endpoint = this.buildEndpoint(provider, providerConfig);
+		const payload: Record<string, unknown> = {
 			messages: [
 				{ role: "system", content: buildSystemPrompt(this.settings) },
 				{ role: "user", content: userInput },
@@ -34,6 +34,10 @@ export class LlmClient {
 			temperature: this.settings.temperature,
 			max_tokens: this.settings.maxTokens,
 		};
+
+		if (provider !== "azureopenai") {
+			payload.model = providerConfig.model;
+		}
 
 		const response = await requestUrl({
 			url: endpoint,
@@ -69,13 +73,36 @@ export class LlmClient {
 		throw new Error("Model returned an empty response.");
 	}
 
+	private buildEndpoint(provider: LlmProvider, config: ProviderConfig): string {
+		const baseUrl = config.baseUrl.replace(/\/$/, "");
+		if (provider === "azureopenai") {
+			const deployment = encodeURIComponent(config.model);
+			const apiVersion = encodeURIComponent(config.apiVersion ?? getAzureDefaultApiVersion());
+			return `${baseUrl}/openai/deployments/${deployment}/chat/completions?api-version=${apiVersion}`;
+		}
+		return `${baseUrl}/chat/completions`;
+	}
+
 	private buildHeaders(provider: LlmProvider, apiKey: string): Record<string, string> {
+		if (provider === "azureopenai") {
+			return {
+				"api-key": apiKey,
+				"Content-Type": "application/json",
+			};
+		}
+
 		if (provider === "github-copilot") {
 			return {
 				Authorization: `Bearer ${apiKey}`,
 				"Content-Type": "application/json",
 				Accept: "application/json",
 				"X-GitHub-Api-Version": "2022-11-28",
+			};
+		}
+
+		if (!apiKey.trim()) {
+			return {
+				"Content-Type": "application/json",
 			};
 		}
 

@@ -1,35 +1,20 @@
 import { App, PluginSettingTab, Setting } from "obsidian";
 import SpeakMathPlugin from "./main";
 import type { LatexPluginSettings, LlmProvider } from "./types";
+import {
+	createDefaultProviderConfigs,
+	getAzureDefaultApiVersion,
+	getProviderLabel,
+	PROVIDER_METADATA,
+	providerNeedsApiKey,
+} from "./providers";
 
 export const DEFAULT_SETTINGS: LatexPluginSettings = {
 	provider: "alibaba-bailian",
-	providers: {
-		"alibaba-bailian": {
-			apiKey: "",
-			baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
-			model: "qwen-plus",
-		},
-		"github-copilot": {
-			apiKey: "",
-			baseUrl: "https://models.github.ai/inference",
-			model: "openai/gpt-4.1-mini",
-		},
-		deepseek: {
-			apiKey: "",
-			baseUrl: "https://api.deepseek.com/v1",
-			model: "deepseek-chat",
-		},
-	},
+	providers: createDefaultProviderConfigs(),
 	temperature: 0.2,
 	maxTokens: 400,
 	promptTemplateOverride: "",
-};
-
-const PROVIDER_OPTIONS: Record<LlmProvider, string> = {
-	"alibaba-bailian": "Alibaba Bailian (Qwen)",
-	"github-copilot": "GitHub Copilot (GitHub Models)",
-	deepseek: "DeepSeek",
 };
 
 export class SpeakMathSettingTab extends PluginSettingTab {
@@ -38,6 +23,13 @@ export class SpeakMathSettingTab extends PluginSettingTab {
 	constructor(app: App, plugin: SpeakMathPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
+	}
+
+	private getProviderOptions(): Array<[LlmProvider, string]> {
+		return (Object.keys(PROVIDER_METADATA) as LlmProvider[]).map((provider) => [
+			provider,
+			getProviderLabel(provider),
+		]);
 	}
 
 	display(): void {
@@ -50,7 +42,7 @@ export class SpeakMathSettingTab extends PluginSettingTab {
 			.setName("Active provider")
 			.setDesc("Select which API is used for formula generation.")
 			.addDropdown((dropdown) => {
-				for (const [key, label] of Object.entries(PROVIDER_OPTIONS)) {
+				for (const [key, label] of this.getProviderOptions()) {
 					dropdown.addOption(key, label);
 				}
 				dropdown.setValue(this.plugin.settings.provider);
@@ -63,12 +55,18 @@ export class SpeakMathSettingTab extends PluginSettingTab {
 
 		const provider = this.plugin.settings.provider;
 		const config = this.plugin.settings.providers[provider];
+		const providerLabel = getProviderLabel(provider);
+		const requiresApiKey = providerNeedsApiKey(provider);
 
-		new Setting(containerEl).setName(`${PROVIDER_OPTIONS[provider]} config`).setHeading();
+		new Setting(containerEl).setName(`${providerLabel} config`).setHeading();
 
 		new Setting(containerEl)
 			.setName("API key")
-			.setDesc("Stored locally in Obsidian plugin data.")
+			.setDesc(
+				requiresApiKey
+					? "Stored locally in Obsidian plugin data."
+					: "Optional for local/self-hosted providers.",
+			)
 			.addText((text) =>
 				text
 					.setPlaceholder("Enter API key")
@@ -78,6 +76,21 @@ export class SpeakMathSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 					}),
 			);
+
+		if (provider === "azureopenai") {
+			new Setting(containerEl)
+				.setName("Azure API version")
+				.setDesc("Required by Azure OpenAI endpoints.")
+				.addText((text) =>
+					text
+						.setPlaceholder(getAzureDefaultApiVersion())
+						.setValue(config.apiVersion ?? getAzureDefaultApiVersion())
+						.onChange(async (value) => {
+							config.apiVersion = value.trim() || getAzureDefaultApiVersion();
+							await this.plugin.saveSettings();
+						}),
+				);
+		}
 
 		new Setting(containerEl)
 			.setName("Base URL")

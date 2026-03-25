@@ -37,6 +37,12 @@
 	color: var(--text-muted);
 }
 
+.latex-llm-price-hint {
+	margin-top: 4px;
+	font-size: 11px;
+	color: var(--text-faint);
+}
+
 .latex-llm-results {
 	margin-top: 10px;
 	display: flex;

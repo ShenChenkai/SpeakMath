@@ -1,6 +1,6 @@
 {
 	"name": "speakmath",
-	"version": "1.0.0",
+	"version": "2.0.0",
 	"description": "Obsidian plugin for quick LaTeX insertion via LLM APIs",
 	"main": "main.js",
 	"type": "module",

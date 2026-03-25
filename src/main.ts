@@ -2,6 +2,7 @@ import { Editor, MarkdownView, Notice, Plugin } from "obsidian";
 import { FormulaPopover } from "./ui/formulaPopover";
 import { DEFAULT_SETTINGS, SpeakMathSettingTab } from "./settings";
 import type { LatexPluginSettings } from "./types";
+import { normalizeProviderConfigs, PROVIDER_METADATA } from "./providers";
 
 export default class SpeakMathPlugin extends Plugin {
 	settings: LatexPluginSettings;
@@ -30,13 +31,16 @@ export default class SpeakMathPlugin extends Plugin {
 
 	async loadSettings(): Promise<void> {
 		const savedData = (await this.loadData()) as Partial<LatexPluginSettings> | null;
+		const provider = savedData?.provider;
+		const activeProvider =
+			provider && Object.prototype.hasOwnProperty.call(PROVIDER_METADATA, provider)
+				? provider
+				: DEFAULT_SETTINGS.provider;
 		this.settings = {
 			...DEFAULT_SETTINGS,
 			...savedData,
-			providers: {
-				...DEFAULT_SETTINGS.providers,
-				...(savedData?.providers ?? {}),
-			},
+			provider: activeProvider,
+			providers: normalizeProviderConfigs(savedData?.providers),
 		};
 	}
 

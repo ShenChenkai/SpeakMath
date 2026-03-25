@@ -1,9 +1,21 @@
-export type LlmProvider = "alibaba-bailian" | "github-copilot" | "deepseek";
+export type LlmProvider =
+	| "alibaba-bailian"
+	| "github-copilot"
+	| "deepseek"
+	| "volcengine-ark"
+	| "zhipu"
+	| "minimax"
+	| "moonshot"
+	| "openrouter"
+	| "siliconflow"
+	| "azureopenai"
+	| "ollama";
 
 export interface ProviderConfig {
 	apiKey: string;
 	baseUrl: string;
 	model: string;
+	apiVersion?: string;
 }
 
 export interface LatexPluginSettings {

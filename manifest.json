@@ -1,7 +1,7 @@
 {
 	"id": "speakmath",
 	"name": "SpeakMath",
-	"version": "1.0.0",
+	"version": "2.0.0",
 	"minAppVersion": "1.5.0",
 	"description": "Use natural language to generate LaTeX formula candidates and insert them at the cursor.",
 	"author": "chenkai",

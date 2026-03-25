@@ -2,6 +2,7 @@ import { Component, MarkdownRenderer, Notice, type Editor, type MarkdownView, ty
 import { LlmClient } from "../llm/client";
 import { parseLatexCandidates } from "../llm/parser";
 import type { LatexCandidate, LatexPluginSettings } from "../types";
+import { formatFormulasPerYuanHint } from "../providers";
 
 interface FormulaPopoverOptions {
 	plugin: Plugin;
@@ -85,6 +86,13 @@ export class FormulaPopover {
 		hint.className = "latex-llm-hint";
 		hint.textContent = "Press Enter to generate, Shift+Enter for newline, Esc to close";
 		container.appendChild(hint);
+
+		const provider = this.settings.provider;
+		const model = this.settings.providers[provider].model;
+		const priceHint = document.createElement("div");
+		priceHint.className = "latex-llm-price-hint";
+		priceHint.textContent = formatFormulasPerYuanHint(provider, model);
+		container.appendChild(priceHint);
 
 		this.resultsEl = document.createElement("div");
 		this.resultsEl.className = "latex-llm-results";
