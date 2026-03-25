@@ -1,6 +1,8 @@
 import esbuild from "esbuild";
 import process from "process";
 import { builtinModules } from 'node:module';
+import fs from "node:fs";
+import path from "node:path";
 
 const banner =
 `/*
@@ -11,6 +13,32 @@ if you want to view the source, please visit the github repository of this plugi
 
 const prod = (process.argv[2] === "production");
 
+function copyCopilotRuntime() {
+	const repoRoot = process.cwd();
+	const githubModulesDir = path.join(repoRoot, "node_modules", "@github");
+	const runtimeRoot = path.join(repoRoot, ".copilot-runtime", "node_modules", "@github");
+
+	if (!fs.existsSync(githubModulesDir)) {
+		return;
+	}
+
+	fs.mkdirSync(runtimeRoot, { recursive: true });
+	const entries = fs.readdirSync(githubModulesDir, { withFileTypes: true });
+	for (const entry of entries) {
+		if (!entry.isDirectory()) {
+			continue;
+		}
+		if (!entry.name.startsWith("copilot")) {
+			continue;
+		}
+
+		const sourceDir = path.join(githubModulesDir, entry.name);
+		const targetDir = path.join(runtimeRoot, entry.name);
+		fs.rmSync(targetDir, { recursive: true, force: true });
+		fs.cpSync(sourceDir, targetDir, { recursive: true });
+	}
+}
+
 const context = await esbuild.context({
 	banner: {
 		js: banner,
@@ -20,6 +48,9 @@ const context = await esbuild.context({
 	external: [
 		"obsidian",
 		"electron",
+		"@github/copilot-sdk",
+		"@github/copilot",
+		"@github/*",
 		"@codemirror/autocomplete",
 		"@codemirror/collab",
 		"@codemirror/commands",
@@ -31,7 +62,8 @@ const context = await esbuild.context({
 		"@lezer/common",
 		"@lezer/highlight",
 		"@lezer/lr",
-		...builtinModules],
+		...builtinModules,
+		...builtinModules.map((name) => `node:${name}`)],
 	format: "cjs",
 	target: "es2018",
 	logLevel: "info",
@@ -43,7 +75,9 @@ const context = await esbuild.context({
 
 if (prod) {
 	await context.rebuild();
+	copyCopilotRuntime();
 	process.exit(0);
 } else {
+	copyCopilotRuntime();
 	await context.watch();
 }

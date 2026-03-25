@@ -1,13 +1,26 @@
-import { App, PluginSettingTab, Setting } from "obsidian";
+import { App, Notice, PluginSettingTab, Setting } from "obsidian";
 import SpeakMathPlugin from "./main";
 import type { LatexPluginSettings, LlmProvider } from "./types";
 import {
 	createDefaultProviderConfigs,
+	getGithubModelDisplayLabel,
 	getAzureDefaultApiVersion,
+	getProviderAuthHint,
 	getProviderLabel,
+	getProviderModelOptionItems,
 	PROVIDER_METADATA,
 	providerNeedsApiKey,
 } from "./providers";
+import { LlmClient } from "./llm/client";
+import {
+	fetchGithubAvailableModels,
+	getCopilotLoginStatus,
+	startCopilotLoginFlow,
+} from "./llm/copilotSdk";
+import { resolvePluginBasePath } from "./utils/runtimePath";
+
+let githubAvailableModelsCache: string[] | null = null;
+let githubAvailableModelsCacheToken = "";
 
 export const DEFAULT_SETTINGS: LatexPluginSettings = {
 	provider: "alibaba-bailian",
@@ -57,14 +70,175 @@ export class SpeakMathSettingTab extends PluginSettingTab {
 		const config = this.plugin.settings.providers[provider];
 		const providerLabel = getProviderLabel(provider);
 		const requiresApiKey = providerNeedsApiKey(provider);
+		const authHint = getProviderAuthHint(provider);
 
 		new Setting(containerEl).setName(`${providerLabel} config`).setHeading();
+
+		if (authHint) {
+			new Setting(containerEl).setName("Auth hint").setDesc(authHint);
+		}
+
+		if (provider === "github-copilot") {
+			let latestVerificationCode = "";
+			const copyVerificationCode = async () => {
+				if (!latestVerificationCode) {
+					new Notice("No verification code available yet.", 4000);
+					return;
+				}
+				try {
+					await navigator.clipboard.writeText(latestVerificationCode);
+					new Notice("Verification code copied.", 3000);
+				} catch {
+					new Notice("Could not copy code automatically. Please copy it manually.", 7000);
+				}
+			};
+
+			const statusSetting = new Setting(containerEl)
+				.setName("GitHub login status")
+				.setDesc("Checking...")
+				.addButton((button) =>
+					button.setButtonText("Refresh status").onClick(async () => {
+						button.setDisabled(true);
+						button.setButtonText("Refreshing...");
+						try {
+							const status = await getCopilotLoginStatus(Boolean(config.apiKey.trim()));
+							statusSetting.setDesc(`${status.state}: ${status.message}`);
+						} finally {
+							button.setDisabled(false);
+							button.setButtonText("Refresh status");
+						}
+					}),
+				);
+
+			void getCopilotLoginStatus(Boolean(config.apiKey.trim())).then((status) => {
+				statusSetting.setDesc(`${status.state}: ${status.message}`);
+			});
+
+			const loginGuideSetting = new Setting(containerEl).setName("Login steps");
+			const renderLoginGuide = (code?: string, state?: "waiting" | "done") => {
+				if (code) {
+					latestVerificationCode = code;
+				}
+				loginGuideSetting.descEl.empty();
+				loginGuideSetting.descEl.createEl("p", {
+					text: "1) Click 'Login my GitHub account'.",
+				});
+				loginGuideSetting.descEl.createEl("p", {
+					text: "2) Browser opens GitHub device login page.",
+				});
+				loginGuideSetting.descEl.createEl("p", {
+					text: "3) Enter the verification code shown below and approve.",
+				});
+				if (code) {
+					loginGuideSetting.descEl.createEl("p", {
+						text: `Verification code: ${code}`,
+					});
+					const copyBtn = loginGuideSetting.descEl.createEl("button", {
+						text: "Copy verification code",
+					});
+					copyBtn.addClass("mod-cta");
+					copyBtn.style.marginTop = "4px";
+					copyBtn.onclick = () => {
+						void copyVerificationCode();
+					};
+					loginGuideSetting.descEl.createEl("p", {
+						text: "Code is auto-copied and you can also click the button above.",
+					});
+				}
+				if (state === "waiting") {
+					loginGuideSetting.descEl.createEl("p", {
+						text: "Waiting for GitHub authorization...",
+					});
+				}
+				if (state === "done") {
+					loginGuideSetting.descEl.createEl("p", {
+						text: "Authorization completed. You can use GitHub Copilot now.",
+					});
+				}
+			};
+
+			renderLoginGuide();
+
+			new Setting(containerEl)
+				.setName("GitHub account login")
+				.setDesc("Zero-config web authentication via GitHub.")
+				.addButton((button) =>
+					button.setButtonText("Login my GitHub account").onClick(async () => {
+						button.setDisabled(true);
+						button.setButtonText("Waiting for GitHub...");
+						renderLoginGuide(undefined, "waiting");
+
+						try {
+							const token = await startCopilotLoginFlow((code) => {
+								new Notice(`Confirmation code: ${code}. Copied to clipboard!`, 10000);
+								renderLoginGuide(code, "waiting");
+								latestVerificationCode = code;
+								void copyVerificationCode();
+							});
+
+							config.apiKey = token;
+							await this.plugin.saveSettings();
+							new Notice("Successfully logged into GitHub Copilot!");
+							renderLoginGuide(undefined, "done");
+							this.display(); // Refresh UI to show login status and token
+						} catch (error) {
+							const msg = error instanceof Error ? error.message : String(error);
+							new Notice(`GitHub login failed: ${msg}`);
+							renderLoginGuide();
+							button.setDisabled(false);
+							button.setButtonText("Login my GitHub account");
+						}
+					}),
+				);
+
+			new Setting(containerEl)
+				.setName("Available models")
+				.setDesc("Fetch model list available to your current GitHub account.")
+				.addButton((button) =>
+					button.setButtonText("Refresh model list").onClick(async () => {
+						const token = config.apiKey.trim();
+						if (!token) {
+							new Notice("Please login first, then refresh model list.", 5000);
+							return;
+						}
+						button.setDisabled(true);
+						button.setButtonText("Refreshing...");
+						try {
+							const models = await fetchGithubAvailableModels(token);
+							if (models.length === 0) {
+								new Notice("Could not fetch available models from GitHub.", 7000);
+								return;
+							}
+							githubAvailableModelsCache = models;
+							githubAvailableModelsCacheToken = token;
+							new Notice(`Loaded ${models.length} GitHub models.`);
+							this.display();
+						} finally {
+							button.setDisabled(false);
+							button.setButtonText("Refresh model list");
+						}
+					}),
+				);
+
+			const token = config.apiKey.trim();
+			if (token && (!githubAvailableModelsCache || githubAvailableModelsCacheToken !== token)) {
+				void fetchGithubAvailableModels(token).then((models) => {
+					if (models.length > 0) {
+						githubAvailableModelsCache = models;
+						githubAvailableModelsCacheToken = token;
+						this.display();
+					}
+				});
+			}
+		}
 
 		new Setting(containerEl)
 			.setName("API key")
 			.setDesc(
 				requiresApiKey
-					? "Stored locally in Obsidian plugin data."
+					? provider === "github-copilot"
+						? "Required for GitHub provider in no-CLI-auth mode."
+						: "Stored locally in Obsidian plugin data."
 					: "Optional for local/self-hosted providers.",
 			)
 			.addText((text) =>
@@ -92,30 +266,73 @@ export class SpeakMathSettingTab extends PluginSettingTab {
 				);
 		}
 
-		new Setting(containerEl)
-			.setName("Base URL")
-			.setDesc("Openai-compatible endpoint root. Do not include /chat/completions.")
-			.addText((text) =>
-				text
-					.setPlaceholder("https://api.example.com/v1")
-					.setValue(config.baseUrl)
-					.onChange(async (value) => {
-						config.baseUrl = value.trim();
-						await this.plugin.saveSettings();
-					}),
-			);
+		if (provider !== "github-copilot") {
+			new Setting(containerEl)
+				.setName("Base URL")
+				.setDesc("Openai-compatible endpoint root. Do not include /chat/completions.")
+				.addText((text) =>
+					text
+						.setPlaceholder("https://api.example.com/v1")
+						.setValue(config.baseUrl)
+						.onChange(async (value) => {
+							config.baseUrl = value.trim();
+							await this.plugin.saveSettings();
+						}),
+				);
+		}
 
 		new Setting(containerEl)
 			.setName("Model")
-			.setDesc("Model name for the selected provider.")
-			.addText((text) =>
-				text
-					.setPlaceholder("Model name")
-					.setValue(config.model)
-					.onChange(async (value) => {
-						config.model = value.trim();
-						await this.plugin.saveSettings();
-					}),
+			.setDesc(
+				provider === "github-copilot"
+					? "Select a Copilot model."
+					: "Select a model for the selected provider.",
+			)
+			.addDropdown((dropdown) => {
+				const options =
+					provider === "github-copilot" && githubAvailableModelsCache && githubAvailableModelsCache.length > 0
+						? githubAvailableModelsCache.map((model) => ({
+								value: model,
+								label: getGithubModelDisplayLabel(model),
+							}))
+						: getProviderModelOptionItems(provider);
+				const current = config.model;
+				const hasCurrent = options.some((option) => option.value === current);
+				const mergedOptions = hasCurrent
+					? options
+					: [{ value: current, label: `Custom: ${current}` }, ...options];
+
+				for (const option of mergedOptions) {
+					dropdown.addOption(option.value, option.label);
+				}
+
+				dropdown.setValue(current);
+				dropdown.onChange(async (value) => {
+					config.model = value;
+					await this.plugin.saveSettings();
+				});
+			});
+
+		new Setting(containerEl)
+			.setName("Connection test")
+			.setDesc("Send a tiny test request using current provider settings.")
+			.addButton((button) =>
+				button.setButtonText("Test connection").onClick(async () => {
+					button.setDisabled(true);
+					button.setButtonText("Testing...");
+					try {
+						const client = new LlmClient(this.plugin.settings, resolvePluginBasePath(this.plugin));
+						const result = await client.testConnection();
+						if (result.ok) {
+							new Notice(`${providerLabel}: ${result.message}`);
+						} else {
+							new Notice(`${providerLabel}: ${result.message}`, 8000);
+						}
+					} finally {
+						button.setDisabled(false);
+						button.setButtonText("Test connection");
+					}
+				}),
 			);
 
 		new Setting(containerEl)

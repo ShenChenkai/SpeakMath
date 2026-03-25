@@ -2,6 +2,7 @@ import { requestUrl } from "obsidian";
 import type { LatexPluginSettings, LlmProvider, ProviderConfig } from "../types";
 import { buildSystemPrompt } from "../prompt";
 import { getAzureDefaultApiVersion, providerNeedsApiKey } from "../providers";
+import { generateWithCopilotSdk } from "./copilotSdk";
 
 interface OpenAICompatibleResponse {
 	choices?: Array<{
@@ -15,11 +16,48 @@ interface OpenAICompatibleResponse {
 }
 
 export class LlmClient {
-	constructor(private readonly settings: LatexPluginSettings) {}
+	constructor(
+		private readonly settings: LatexPluginSettings,
+		private readonly pluginBasePath: string | null = null,
+	) {}
+
+	async testConnection(): Promise<{ ok: true; message: string } | { ok: false; message: string }> {
+		const startedAt = Date.now();
+		try {
+			await this.generateText("Return exactly OK.", 16);
+			const elapsed = Date.now() - startedAt;
+			return {
+				ok: true,
+				message: `Connection successful (${elapsed}ms).`,
+			};
+		} catch (error) {
+			const message = error instanceof Error ? error.message : "Unknown error";
+			return {
+				ok: false,
+				message,
+			};
+		}
+	}
 
 	async generateFormulaCandidates(userInput: string): Promise<string> {
+		return this.generateText(userInput, this.settings.maxTokens);
+	}
+
+	private async generateText(userInput: string, maxTokens: number): Promise<string> {
 		const provider = this.settings.provider;
 		const providerConfig = this.settings.providers[provider];
+
+		if (provider === "github-copilot") {
+			const sdkResult = await generateWithCopilotSdk({
+				model: providerConfig.model,
+				prompt: `${buildSystemPrompt(this.settings)}\n\nUser request:\n${userInput}`,
+				githubToken: providerConfig.apiKey,
+			});
+			if (!sdkResult.ok || !sdkResult.content) {
+				throw new Error(sdkResult.error ?? "GitHub Copilot SDK request failed.");
+			}
+			return sdkResult.content;
+		}
 
 		if (providerNeedsApiKey(provider) && !providerConfig.apiKey.trim()) {
 			throw new Error(`Provider ${provider} has no API key configured.`);
@@ -32,7 +70,7 @@ export class LlmClient {
 				{ role: "user", content: userInput },
 			],
 			temperature: this.settings.temperature,
-			max_tokens: this.settings.maxTokens,
+			max_tokens: maxTokens,
 		};
 
 		if (provider !== "azureopenai") {
@@ -88,15 +126,6 @@ export class LlmClient {
 			return {
 				"api-key": apiKey,
 				"Content-Type": "application/json",
-			};
-		}
-
-		if (provider === "github-copilot") {
-			return {
-				Authorization: `Bearer ${apiKey}`,
-				"Content-Type": "application/json",
-				Accept: "application/json",
-				"X-GitHub-Api-Version": "2022-11-28",
 			};
 		}
 

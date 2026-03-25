@@ -9,6 +9,9 @@ Use natural language to generate LaTeX formula candidates and insert the selecte
 - Parse markdown output and detect multiple formula candidates automatically.
 - Render candidate formulas in markdown and insert on click.
 - Show an estimate near the input: "How many formula outputs per CNY 1" for current model.
+- Add a one-click "Test connection" button in settings to validate API credentials and endpoint.
+- Add a GitHub provider "Login my GitHub account" button to open GitHub web auth/token page.
+- Add a GitHub login status indicator with one-click refresh.
 - Supported providers:
   - Alibaba Bailian (Qwen)
   - GitHub Copilot (GitHub Models API)
@@ -49,8 +52,16 @@ npm run build
 - The plugin uses OpenAI-compatible chat-completions endpoints.
 - Azure OpenAI uses deployment endpoints and supports custom `api-version` in settings.
 - Ollama can run without API key when using a local server.
+- GitHub provider uses official Copilot SDK mode with token authentication.
 - API keys are saved in Obsidian plugin data on your local device.
 - Prompt customization is kept as an extension point (advanced setting), while v1 focuses on built-in prompt constraints.
+
+## GitHub provider auth
+
+- Select GitHub provider and click `Login my GitHub account` in plugin settings.
+- The button opens GitHub web sign-in/token page.
+- Use `Refresh status` to check whether API key is configured.
+- Paste your GitHub token into API key before calling GitHub provider.
 
 ## Recommended model & platform (math + cost + speed)
 

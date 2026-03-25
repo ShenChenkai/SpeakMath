@@ -3,6 +3,7 @@ import { LlmClient } from "../llm/client";
 import { parseLatexCandidates } from "../llm/parser";
 import type { LatexCandidate, LatexPluginSettings } from "../types";
 import { formatFormulasPerYuanHint } from "../providers";
+import { resolvePluginBasePath } from "../utils/runtimePath";
 
 interface FormulaPopoverOptions {
 	plugin: Plugin;
@@ -152,17 +153,25 @@ export class FormulaPopover {
 		loadingEl.setText("Generating formulas...");
 
 		try {
-			const client = new LlmClient(this.settings);
+			const client = new LlmClient(this.settings, resolvePluginBasePath(this.plugin));
 			const response = await client.generateFormulaCandidates(query);
 			const candidates = parseLatexCandidates(response);
 			this.renderCandidates(candidates);
 		} catch (error) {
 			const message = error instanceof Error ? error.message : "Unknown error";
-			new Notice(`Formula generation failed: ${message}`);
+			console.error("SpeakMath formula generation failed", error);
+			new Notice(`Formula generation failed: ${this.toUserFriendlyError(message)}`, 7000);
 			this.resultsEl.empty();
 		} finally {
 			this.loading = false;
 		}
+	}
+
+	private toUserFriendlyError(message: string): string {
+		if (message.includes("Copilot runtime not found") || message.includes("Copilot CLI runtime")) {
+			return "Copilot runtime not found in active vault plugin folder. Rebuild plugin and reload Obsidian.";
+		}
+		return message.length > 180 ? `${message.slice(0, 180)}...` : message;
 	}
 
 	private renderCandidates(candidates: LatexCandidate[]): void {

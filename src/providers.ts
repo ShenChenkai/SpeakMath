@@ -9,9 +9,49 @@ interface ModelPricing {
 export interface ProviderMetadata {
 	label: string;
 	requiresApiKey: boolean;
+	authHint?: string;
 	defaultConfig: ProviderConfig;
 	pricing: ModelPricing[];
+	modelOptions?: string[];
 }
+
+interface ModelOptionItem {
+	value: string;
+	label: string;
+}
+
+const GITHUB_MODEL_RATE_HINTS: Record<string, string> = {
+	"claude-haiku-4.5": "0.33x",
+	"anthropic/claude-haiku-4.5": "0.33x",
+	"gemini-2.5-pro": "1x",
+	"google/gemini-2.5-pro": "1x",
+	"gemini-3-pro": "1x",
+	"google/gemini-3-pro-preview": "1x",
+	"gpt-4.1": "0x",
+	"openai/gpt-4.1": "0x",
+	"gpt-4o": "0x",
+	"openai/gpt-4o": "0x",
+	"gpt-5-mini": "0x",
+	"openai/gpt-5-mini": "0x",
+	"gpt-5.1": "1x",
+	"openai/gpt-5.1": "1x",
+	"gpt-5.1-codex": "1x",
+	"openai/gpt-5.1-codex": "1x",
+	"gpt-5.1-codex-max": "1x",
+	"openai/gpt-5.1-codex-max": "1x",
+	"gpt-5.1-codex-mini": "0.33x",
+	"openai/gpt-5.1-codex-mini": "0.33x",
+	"gpt-5.2": "1x",
+	"openai/gpt-5.2": "1x",
+	"gpt-5.2-codex": "1x",
+	"openai/gpt-5.2-codex": "1x",
+	"gpt-5.4-mini": "0.33x",
+	"openai/gpt-5.4-mini": "0.33x",
+	"grok-code-fast-1": "0.25x",
+	"xai/grok-code-fast-1": "0.25x",
+	"raptor-mini": "0x",
+	"openai/raptor-mini": "0x",
+};
 
 const DEFAULT_AZURE_API_VERSION = "2024-10-21";
 const AVG_OUTPUT_TOKENS_PER_FORMULA = 140;
@@ -25,6 +65,7 @@ export const PROVIDER_METADATA: Record<LlmProvider, ProviderMetadata> = {
 			baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
 			model: "qwen-plus",
 		},
+		modelOptions: ["qwen-plus", "qwen-max", "qwen-turbo"],
 		pricing: [
 			{
 				modelNames: ["qwen-plus"],
@@ -34,16 +75,35 @@ export const PROVIDER_METADATA: Record<LlmProvider, ProviderMetadata> = {
 		],
 	},
 	"github-copilot": {
-		label: "GitHub Copilot (GitHub Models)",
+		label: "GitHub Copilot (Web API)",
 		requiresApiKey: true,
+		authHint:
+			"No CLI dependency. Click Login to authorize GitHub in browser; token is saved automatically.",
 		defaultConfig: {
 			apiKey: "",
-			baseUrl: "https://models.github.ai/inference",
-			model: "openai/gpt-4.1-mini",
+			baseUrl: "https://models.inference.ai.azure.com",
+			model: "gpt-5.1",
 		},
+		modelOptions: [
+			"claude-haiku-4.5",
+			"gemini-2.5-pro",
+			"gemini-3-pro",
+			"gpt-4.1",
+			"gpt-4o",
+			"gpt-5-mini",
+			"gpt-5.1",
+			"gpt-5.1-codex",
+			"gpt-5.1-codex-max",
+			"gpt-5.1-codex-mini",
+			"gpt-5.2",
+			"gpt-5.2-codex",
+			"gpt-5.4-mini",
+			"grok-code-fast-1",
+			"raptor-mini",
+		],
 		pricing: [
 			{
-				modelNames: ["openai/gpt-4.1-mini"],
+				modelNames: ["gpt-5.1"],
 				inputPerMillionCny: 2.9,
 				outputPerMillionCny: 11.5,
 			},
@@ -57,6 +117,7 @@ export const PROVIDER_METADATA: Record<LlmProvider, ProviderMetadata> = {
 			baseUrl: "https://api.deepseek.com/v1",
 			model: "deepseek-chat",
 		},
+		modelOptions: ["deepseek-chat", "deepseek-reasoner", "deepseek-v3"],
 		pricing: [
 			{
 				modelNames: ["deepseek-chat", "deepseek-v3"],
@@ -73,6 +134,7 @@ export const PROVIDER_METADATA: Record<LlmProvider, ProviderMetadata> = {
 			baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
 			model: "deepseek-v3-250324",
 		},
+		modelOptions: ["deepseek-v3-250324", "doubao-pro-32k", "doubao-lite-32k"],
 		pricing: [
 			{
 				modelNames: ["deepseek-v3-250324", "deepseek-v3"],
@@ -89,6 +151,7 @@ export const PROVIDER_METADATA: Record<LlmProvider, ProviderMetadata> = {
 			baseUrl: "https://open.bigmodel.cn/api/paas/v4",
 			model: "glm-4-air",
 		},
+		modelOptions: ["glm-4-air", "glm-4-plus", "glm-4.5"],
 		pricing: [
 			{
 				modelNames: ["glm-4-air"],
@@ -105,6 +168,7 @@ export const PROVIDER_METADATA: Record<LlmProvider, ProviderMetadata> = {
 			baseUrl: "https://api.minimax.chat/v1",
 			model: "MiniMax-Text-01",
 		},
+		modelOptions: ["MiniMax-Text-01", "MiniMax-Text-01-pro"],
 		pricing: [
 			{
 				modelNames: ["minimax-text-01", "minimax-text"],
@@ -121,6 +185,7 @@ export const PROVIDER_METADATA: Record<LlmProvider, ProviderMetadata> = {
 			baseUrl: "https://api.moonshot.cn/v1",
 			model: "moonshot-v1-8k",
 		},
+		modelOptions: ["moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"],
 		pricing: [
 			{
 				modelNames: ["moonshot-v1-8k", "moonshot-v1-32k"],
@@ -137,6 +202,11 @@ export const PROVIDER_METADATA: Record<LlmProvider, ProviderMetadata> = {
 			baseUrl: "https://openrouter.ai/api/v1",
 			model: "deepseek/deepseek-chat-v3-0324",
 		},
+		modelOptions: [
+			"deepseek/deepseek-chat-v3-0324",
+			"openai/gpt-4.1-mini",
+			"anthropic/claude-sonnet-4.5",
+		],
 		pricing: [
 			{
 				modelNames: ["deepseek/deepseek-chat-v3-0324", "deepseek/deepseek-chat"],
@@ -153,6 +223,7 @@ export const PROVIDER_METADATA: Record<LlmProvider, ProviderMetadata> = {
 			baseUrl: "https://api.siliconflow.cn/v1",
 			model: "deepseek-ai/DeepSeek-V3",
 		},
+		modelOptions: ["deepseek-ai/DeepSeek-V3", "deepseek-ai/DeepSeek-R1", "Qwen/Qwen2.5-72B-Instruct"],
 		pricing: [
 			{
 				modelNames: ["deepseek-ai/deepseek-v3", "deepseek-ai/deepseek-r1"],
@@ -170,6 +241,7 @@ export const PROVIDER_METADATA: Record<LlmProvider, ProviderMetadata> = {
 			model: "gpt-4o-mini",
 			apiVersion: DEFAULT_AZURE_API_VERSION,
 		},
+		modelOptions: ["gpt-4o-mini", "gpt-4.1-mini", "gpt-4o"],
 		pricing: [
 			{
 				modelNames: ["gpt-4o-mini", "gpt-4.1-mini"],
@@ -186,6 +258,7 @@ export const PROVIDER_METADATA: Record<LlmProvider, ProviderMetadata> = {
 			baseUrl: "http://127.0.0.1:11434/v1",
 			model: "qwen2.5:7b",
 		},
+		modelOptions: ["qwen2.5:7b", "llama3.1:8b", "deepseek-r1:8b"],
 		pricing: [
 			{
 				modelNames: ["*"],
@@ -210,6 +283,58 @@ export function getProviderLabel(provider: LlmProvider): string {
 
 export function providerNeedsApiKey(provider: LlmProvider): boolean {
 	return PROVIDER_METADATA[provider].requiresApiKey;
+}
+
+export function getProviderAuthHint(provider: LlmProvider): string | null {
+	return PROVIDER_METADATA[provider].authHint ?? null;
+}
+
+export function getProviderModelOptions(provider: LlmProvider): string[] {
+	const metadata = PROVIDER_METADATA[provider];
+	const configured = metadata.modelOptions?.filter((name) => name && name !== "*") ?? [];
+	const fromPricing = metadata.pricing.flatMap((item) => item.modelNames).filter((name) => name && name !== "*");
+	const merged = [...configured, ...fromPricing, metadata.defaultConfig.model];
+	return Array.from(new Set(merged));
+}
+
+export function getProviderModelOptionItems(provider: LlmProvider): ModelOptionItem[] {
+	const models = getProviderModelOptions(provider);
+	if (provider !== "github-copilot") {
+		return models.map((model) => ({ value: model, label: model }));
+	}
+	return models.map((model) => ({
+		value: model,
+		label: getGithubModelDisplayLabel(model),
+	}));
+}
+
+export function getGithubModelDisplayLabel(model: string): string {
+	const prettyName = model
+		.replace(/^openai\//, "")
+		.replace(/^google\//, "")
+		.replace(/^anthropic\//, "")
+		.replace(/^xai\//, "")
+		.replace(/-/g, " ")
+		.replace(/\b\w/g, (c) => c.toUpperCase())
+		.replace(/Gpt/g, "GPT")
+		.replace(/Claude Haiku 4 5/, "Claude Haiku 4.5")
+		.replace(/Gemini 2 5 Pro/, "Gemini 2.5 Pro")
+		.replace(/Gemini 3 Pro/, "Gemini 3 Pro (Preview)")
+		.replace(/Grok Code Fast 1/, "Grok Code Fast 1")
+		.replace(/Raptor Mini/, "Raptor mini (Preview)")
+		.replace(/Gpt 4 1/, "GPT-4.1")
+		.replace(/Gpt 4O/, "GPT-4o")
+		.replace(/Gpt 5 Mini/, "GPT-5 mini")
+		.replace(/Gpt 5 1 Codex Max/, "GPT-5.1-Codex-Max")
+		.replace(/Gpt 5 1 Codex Mini/, "GPT-5.1-Codex-Mini")
+		.replace(/Gpt 5 1 Codex/, "GPT-5.1-Codex")
+		.replace(/Gpt 5 2 Codex/, "GPT-5.2-Codex")
+		.replace(/Gpt 5 1/, "GPT-5.1")
+		.replace(/Gpt 5 2/, "GPT-5.2")
+		.replace(/Gpt 5 4 Mini/, "GPT-5.4 mini");
+
+	const rate = GITHUB_MODEL_RATE_HINTS[model] ?? "rate unknown";
+	return `${prettyName} (${rate})`;
 }
 
 export function normalizeProviderConfigs(
