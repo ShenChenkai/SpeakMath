@@ -90,3 +90,10 @@ The recommendations below focus on practical formula generation in Obsidian, bal
 Price notice:
 - The "CNY 1 estimate" is an approximate output-count indicator based on configured model pricing assumptions.
 - Real cost changes with provider pricing updates, prompt length, output length, and cache/billing rules.
+
+## License & Attribution
+
+This project is licensed under the [MIT License](LICENSE).
+
+**Note:** If you use or reference this project, please provide clear attribution to the original source.
+

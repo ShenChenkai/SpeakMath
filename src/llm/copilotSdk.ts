@@ -3,24 +3,6 @@ import { Platform, requestUrl } from "obsidian";
 const CLIENT_ID = "Ov23li5vCskOYu9n6lNu";
 const GITHUB_MODELS_BASE_URL = "https://models.inference.ai.azure.com";
 
-const GITHUB_MODEL_ALIASES: Record<string, string> = {
-	"claude-haiku-4.5": "anthropic/claude-haiku-4.5",
-	"gemini-2.5-pro": "google/gemini-2.5-pro",
-	"gemini-3-pro": "google/gemini-3-pro-preview",
-	"gpt-4.1": "openai/gpt-4.1",
-	"gpt-4o": "openai/gpt-4o",
-	"gpt-5-mini": "openai/gpt-5-mini",
-	"gpt-5.1": "openai/gpt-5.1",
-	"gpt-5.1-codex": "openai/gpt-5.1-codex",
-	"gpt-5.1-codex-max": "openai/gpt-5.1-codex-max",
-	"gpt-5.1-codex-mini": "openai/gpt-5.1-codex-mini",
-	"gpt-5.2": "openai/gpt-5.2",
-	"gpt-5.2-codex": "openai/gpt-5.2-codex",
-	"gpt-5.4-mini": "openai/gpt-5.4-mini",
-	"grok-code-fast-1": "xai/grok-code-fast-1",
-	"raptor-mini": "openai/raptor-mini",
-};
-
 interface CopilotSdkResult {
 	ok: boolean;
 	content?: string;
@@ -67,7 +49,6 @@ export async function generateWithCopilotSdk(options: {
 	}
 
 	const model = options.model.trim() || "openai/gpt-4.1-mini";
-	const resolvedModel = resolveGithubModelName(model);
 	const token = options.githubToken?.trim();
 	if (!token) {
 		return {
@@ -87,7 +68,7 @@ export async function generateWithCopilotSdk(options: {
 			contentType: "application/json",
 			throw: false,
 			body: JSON.stringify({
-				model: resolvedModel,
+				model,
 				messages: [{ role: "user", content: options.prompt }],
 				temperature: 0.2,
 				max_tokens: 800,
@@ -95,23 +76,9 @@ export async function generateWithCopilotSdk(options: {
 		});
 
 		if (response.status >= 400) {
-			const responseText = response.text || "";
-			if (
-				(response.status === 400 || response.status === 404) &&
-				(responseText.toLowerCase().includes("model") || responseText.toLowerCase().includes("deployment"))
-			) {
-				const available = await fetchGithubAvailableModels(token).catch(() => []);
-				if (available.length > 0) {
-					const preview = available.slice(0, 8).join(", ");
-					return {
-						ok: false,
-						error: `Selected model is not available for your account. Current: ${model}. Try one of: ${preview}`,
-					};
-				}
-			}
 			return {
 				ok: false,
-				error: `GitHub request failed (${response.status}): ${responseText}`,
+				error: `GitHub request failed (${response.status}): ${response.text}`,
 			};
 		}
 
@@ -147,37 +114,6 @@ export async function generateWithCopilotSdk(options: {
 			error: normalizeCopilotSdkError(message),
 		};
 	}
-}
-
-export async function fetchGithubAvailableModels(githubToken: string): Promise<string[]> {
-	const token = githubToken.trim();
-	if (!token) {
-		return [];
-	}
-
-	const response = await requestUrl({
-		url: `${GITHUB_MODELS_BASE_URL}/models`,
-		method: "GET",
-		headers: {
-			Authorization: `Bearer ${token}`,
-		},
-		throw: false,
-	});
-
-	if (response.status >= 400) {
-		return [];
-	}
-
-	const models = response.json as Array<{ id?: string }> | { data?: Array<{ id?: string }> } | undefined;
-	const raw = Array.isArray(models) ? models : models?.data;
-	if (!raw || !Array.isArray(raw)) {
-		return [];
-	}
-
-	return raw
-		.map((item) => item.id?.trim() ?? "")
-		.filter(Boolean)
-		.sort((a, b) => a.localeCompare(b));
 }
 
 /**
@@ -299,9 +235,4 @@ function normalizeCopilotSdkError(message: string): string {
 		return "CLI/SKD runtime is disabled. Plugin now uses pure HTTP GitHub API. Please reload Obsidian and retry.";
 	}
 	return message;
-}
-
-function resolveGithubModelName(model: string): string {
-	const normalized = model.trim().toLowerCase();
-	return GITHUB_MODEL_ALIASES[normalized] ?? model.trim();
 }

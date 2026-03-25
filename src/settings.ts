@@ -1,9 +1,14 @@
+/**
+ * SpeakMath - MIT License
+ * Copyright (c) 2024-2025 chenkai
+ * Please attribute the source when using this project.
+ */
+
 import { App, Notice, PluginSettingTab, Setting } from "obsidian";
 import SpeakMathPlugin from "./main";
 import type { LatexPluginSettings, LlmProvider } from "./types";
 import {
 	createDefaultProviderConfigs,
-	getGithubModelDisplayLabel,
 	getAzureDefaultApiVersion,
 	getProviderAuthHint,
 	getProviderLabel,
@@ -12,15 +17,8 @@ import {
 	providerNeedsApiKey,
 } from "./providers";
 import { LlmClient } from "./llm/client";
-import {
-	fetchGithubAvailableModels,
-	getCopilotLoginStatus,
-	startCopilotLoginFlow,
-} from "./llm/copilotSdk";
+import { getCopilotLoginStatus, startCopilotLoginFlow } from "./llm/copilotSdk";
 import { resolvePluginBasePath } from "./utils/runtimePath";
-
-let githubAvailableModelsCache: string[] | null = null;
-let githubAvailableModelsCacheToken = "";
 
 export const DEFAULT_SETTINGS: LatexPluginSettings = {
 	provider: "alibaba-bailian",
@@ -190,46 +188,6 @@ export class SpeakMathSettingTab extends PluginSettingTab {
 						}
 					}),
 				);
-
-			new Setting(containerEl)
-				.setName("Available models")
-				.setDesc("Fetch model list available to your current GitHub account.")
-				.addButton((button) =>
-					button.setButtonText("Refresh model list").onClick(async () => {
-						const token = config.apiKey.trim();
-						if (!token) {
-							new Notice("Please login first, then refresh model list.", 5000);
-							return;
-						}
-						button.setDisabled(true);
-						button.setButtonText("Refreshing...");
-						try {
-							const models = await fetchGithubAvailableModels(token);
-							if (models.length === 0) {
-								new Notice("Could not fetch available models from GitHub.", 7000);
-								return;
-							}
-							githubAvailableModelsCache = models;
-							githubAvailableModelsCacheToken = token;
-							new Notice(`Loaded ${models.length} GitHub models.`);
-							this.display();
-						} finally {
-							button.setDisabled(false);
-							button.setButtonText("Refresh model list");
-						}
-					}),
-				);
-
-			const token = config.apiKey.trim();
-			if (token && (!githubAvailableModelsCache || githubAvailableModelsCacheToken !== token)) {
-				void fetchGithubAvailableModels(token).then((models) => {
-					if (models.length > 0) {
-						githubAvailableModelsCache = models;
-						githubAvailableModelsCacheToken = token;
-						this.display();
-					}
-				});
-			}
 		}
 
 		new Setting(containerEl)
@@ -289,13 +247,7 @@ export class SpeakMathSettingTab extends PluginSettingTab {
 					: "Select a model for the selected provider.",
 			)
 			.addDropdown((dropdown) => {
-				const options =
-					provider === "github-copilot" && githubAvailableModelsCache && githubAvailableModelsCache.length > 0
-						? githubAvailableModelsCache.map((model) => ({
-								value: model,
-								label: getGithubModelDisplayLabel(model),
-							}))
-						: getProviderModelOptionItems(provider);
+				const options = getProviderModelOptionItems(provider);
 				const current = config.model;
 				const hasCurrent = options.some((option) => option.value === current);
 				const mergedOptions = hasCurrent

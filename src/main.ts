@@ -1,3 +1,9 @@
+/**
+ * SpeakMath - MIT License
+ * Copyright (c) 2024-2025 chenkai
+ * Please attribute the source when using this project.
+ */
+
 import { Editor, MarkdownView, Notice, Plugin } from "obsidian";
 import { FormulaPopover } from "./ui/formulaPopover";
 import { DEFAULT_SETTINGS, SpeakMathSettingTab } from "./settings";

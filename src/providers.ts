@@ -20,39 +20,6 @@ interface ModelOptionItem {
 	label: string;
 }
 
-const GITHUB_MODEL_RATE_HINTS: Record<string, string> = {
-	"claude-haiku-4.5": "0.33x",
-	"anthropic/claude-haiku-4.5": "0.33x",
-	"gemini-2.5-pro": "1x",
-	"google/gemini-2.5-pro": "1x",
-	"gemini-3-pro": "1x",
-	"google/gemini-3-pro-preview": "1x",
-	"gpt-4.1": "0x",
-	"openai/gpt-4.1": "0x",
-	"gpt-4o": "0x",
-	"openai/gpt-4o": "0x",
-	"gpt-5-mini": "0x",
-	"openai/gpt-5-mini": "0x",
-	"gpt-5.1": "1x",
-	"openai/gpt-5.1": "1x",
-	"gpt-5.1-codex": "1x",
-	"openai/gpt-5.1-codex": "1x",
-	"gpt-5.1-codex-max": "1x",
-	"openai/gpt-5.1-codex-max": "1x",
-	"gpt-5.1-codex-mini": "0.33x",
-	"openai/gpt-5.1-codex-mini": "0.33x",
-	"gpt-5.2": "1x",
-	"openai/gpt-5.2": "1x",
-	"gpt-5.2-codex": "1x",
-	"openai/gpt-5.2-codex": "1x",
-	"gpt-5.4-mini": "0.33x",
-	"openai/gpt-5.4-mini": "0.33x",
-	"grok-code-fast-1": "0.25x",
-	"xai/grok-code-fast-1": "0.25x",
-	"raptor-mini": "0x",
-	"openai/raptor-mini": "0x",
-};
-
 const DEFAULT_AZURE_API_VERSION = "2024-10-21";
 const AVG_OUTPUT_TOKENS_PER_FORMULA = 140;
 
@@ -302,39 +269,29 @@ export function getProviderModelOptionItems(provider: LlmProvider): ModelOptionI
 	if (provider !== "github-copilot") {
 		return models.map((model) => ({ value: model, label: model }));
 	}
+
+	const githubLabels: Record<string, string> = {
+		"claude-haiku-4.5": "Claude Haiku 4.5 (0.33x)",
+		"gemini-2.5-pro": "Gemini 2.5 Pro (1x)",
+		"gemini-3-pro": "Gemini 3 Pro (Preview) (1x)",
+		"gpt-4.1": "GPT-4.1 (0x)",
+		"gpt-4o": "GPT-4o (0x)",
+		"gpt-5-mini": "GPT-5 mini (0x)",
+		"gpt-5.1": "GPT-5.1 (1x)",
+		"gpt-5.1-codex": "GPT-5.1-Codex (1x)",
+		"gpt-5.1-codex-max": "GPT-5.1-Codex-Max (1x)",
+		"gpt-5.1-codex-mini": "GPT-5.1-Codex-Mini (Preview) (0.33x)",
+		"gpt-5.2": "GPT-5.2 (1x)",
+		"gpt-5.2-codex": "GPT-5.2-Codex (1x)",
+		"gpt-5.4-mini": "GPT-5.4 mini (0.33x)",
+		"grok-code-fast-1": "Grok Code Fast 1 (0.25x)",
+		"raptor-mini": "Raptor mini (Preview) (0x)",
+	};
+
 	return models.map((model) => ({
 		value: model,
-		label: getGithubModelDisplayLabel(model),
+		label: githubLabels[model] ?? `${model} (rate unknown)`,
 	}));
-}
-
-export function getGithubModelDisplayLabel(model: string): string {
-	const prettyName = model
-		.replace(/^openai\//, "")
-		.replace(/^google\//, "")
-		.replace(/^anthropic\//, "")
-		.replace(/^xai\//, "")
-		.replace(/-/g, " ")
-		.replace(/\b\w/g, (c) => c.toUpperCase())
-		.replace(/Gpt/g, "GPT")
-		.replace(/Claude Haiku 4 5/, "Claude Haiku 4.5")
-		.replace(/Gemini 2 5 Pro/, "Gemini 2.5 Pro")
-		.replace(/Gemini 3 Pro/, "Gemini 3 Pro (Preview)")
-		.replace(/Grok Code Fast 1/, "Grok Code Fast 1")
-		.replace(/Raptor Mini/, "Raptor mini (Preview)")
-		.replace(/Gpt 4 1/, "GPT-4.1")
-		.replace(/Gpt 4O/, "GPT-4o")
-		.replace(/Gpt 5 Mini/, "GPT-5 mini")
-		.replace(/Gpt 5 1 Codex Max/, "GPT-5.1-Codex-Max")
-		.replace(/Gpt 5 1 Codex Mini/, "GPT-5.1-Codex-Mini")
-		.replace(/Gpt 5 1 Codex/, "GPT-5.1-Codex")
-		.replace(/Gpt 5 2 Codex/, "GPT-5.2-Codex")
-		.replace(/Gpt 5 1/, "GPT-5.1")
-		.replace(/Gpt 5 2/, "GPT-5.2")
-		.replace(/Gpt 5 4 Mini/, "GPT-5.4 mini");
-
-	const rate = GITHUB_MODEL_RATE_HINTS[model] ?? "rate unknown";
-	return `${prettyName} (${rate})`;
 }
 
 export function normalizeProviderConfigs(
