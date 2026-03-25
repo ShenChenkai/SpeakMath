@@ -1,4 +1,5 @@
 # SpeakMath (Obsidian Plugin)
+<img width="519" height="519" alt="image" src="https://github.com/user-attachments/assets/a3fb85e4-f30d-498b-8178-0f597757a316" />
 
 Use natural language to generate LaTeX formula candidates and insert the selected one at the current cursor.
 
